@@ -15,6 +15,7 @@ def test_smoke_experiment(tmp_path):
         batch_size=16,
         seed=3,
         device="cpu",
+        animations="none",
         clean=True,
     )
     matrices = run_experiment(args)

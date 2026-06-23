@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from matplotlib.animation import FuncAnimation, PillowWriter
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -95,4 +96,59 @@ def save_rollout_plot(
     ax.legend(loc="upper right", fontsize=8)
     fig.tight_layout()
     fig.savefig(output_path, dpi=180)
+    plt.close(fig)
+
+
+def save_rollout_gif(
+    rollout: Rollout,
+    task: RobotTask,
+    output_path: Path,
+    fps: int = 12,
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    ee = np.array([snap["ee"] for snap in rollout.snapshots], dtype=np.float32)
+    obj = np.array([snap["obj"] for snap in rollout.snapshots], dtype=np.float32)
+    goal = np.array(task.goal, dtype=np.float32)
+
+    fig, ax = plt.subplots(figsize=(5, 5))
+    ax.set_xlim(-0.9, 0.9)
+    ax.set_ylim(-0.9, 0.9)
+    ax.set_aspect("equal")
+    ax.grid(True, alpha=0.25)
+    ax.set_title(f"{rollout.task_name}: {'success' if rollout.success else 'failed'}")
+    ax.scatter(goal[0], goal[1], color="#111111", marker="*", s=180, label="goal")
+
+    if task.kind.startswith("drawer"):
+        drawer_y = np.array(task.object_start, dtype=np.float32)[1]
+        ax.plot([-0.75, 0.75], [drawer_y, drawer_y], color="#cccccc", linewidth=7, solid_capstyle="round")
+
+    ee_trace, = ax.plot([], [], color="#222222", linewidth=2, label="end-effector path")
+    ee_point = ax.scatter([], [], color="#222222", s=80, zorder=4, label="end-effector")
+    arm_line, = ax.plot([], [], color="#666666", linewidth=3, alpha=0.8)
+
+    obj_trace = None
+    obj_point = None
+    if task.kind != "reach":
+        obj_trace, = ax.plot([], [], color=task.color, linewidth=2, label="object/handle path")
+        obj_point = ax.scatter([], [], color=task.color, s=110, zorder=5, label="object/handle")
+
+    step_text = ax.text(-0.86, 0.83, "", fontsize=10, color="#222222")
+    ax.legend(loc="upper right", fontsize=8)
+
+    def update(frame: int):
+        ee_trace.set_data(ee[: frame + 1, 0], ee[: frame + 1, 1])
+        ee_point.set_offsets(ee[frame])
+        arm_line.set_data([0.0, ee[frame, 0]], [0.0, ee[frame, 1]])
+        artists = [ee_trace, ee_point, arm_line, step_text]
+
+        if obj_trace is not None and obj_point is not None:
+            obj_trace.set_data(obj[: frame + 1, 0], obj[: frame + 1, 1])
+            obj_point.set_offsets(obj[frame])
+            artists.extend([obj_trace, obj_point])
+
+        step_text.set_text(f"step {frame}/{len(ee) - 1}")
+        return artists
+
+    animation = FuncAnimation(fig, update, frames=len(ee), interval=1000 / fps, blit=False)
+    animation.save(output_path, writer=PillowWriter(fps=fps))
     plt.close(fig)

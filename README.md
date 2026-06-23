@@ -25,6 +25,8 @@ the repo evaluates all tasks seen so far and writes:
 - a success matrix heatmap
 - method comparison plot
 - per-task rollout trajectory PNGs
+- animated rollout GIFs for the final checkpoint
+- a browser-viewable demo gallery
 - forgetting metrics in JSON
 
 Implemented continual-learning baselines:
@@ -57,6 +59,12 @@ Open the generated report:
 runs/quickstart/REPORT.md
 ```
 
+Open the animated robot viewer:
+
+```text
+runs/quickstart/DEMO_GALLERY.html
+```
+
 The most useful files are:
 
 ```text
@@ -64,7 +72,7 @@ runs/quickstart/method_comparison.png
 runs/quickstart/finetune/success_matrix.png
 runs/quickstart/replay/success_matrix.png
 runs/quickstart/ewc/success_matrix.png
-runs/quickstart/*/rollouts/
+runs/quickstart/*/rollouts/after_05_close_drawer/*.gif
 ```
 
 ## Faster smoke test
@@ -77,8 +85,12 @@ python -m continual_robot_sim.run_demo \
   --episodes-per-task 20 \
   --epochs-per-task 3 \
   --eval-episodes 5 \
+  --animations final \
   --methods finetune replay ewc
 ```
+
+Use `--animations all` if you want GIFs after every training checkpoint, not
+only after the final task.
 
 ## How to read the result
 

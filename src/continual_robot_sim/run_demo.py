@@ -15,6 +15,7 @@ from continual_robot_sim.tasks import task_catalog
 from continual_robot_sim.trainers import ContinualTrainer, TrainerConfig
 from continual_robot_sim.visualize import (
     save_forgetting_plot,
+    save_rollout_gif,
     save_rollout_plot,
     save_success_matrix,
 )
@@ -45,6 +46,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--animations",
+        choices=["none", "final", "all"],
+        default="final",
+        help="Write animated GIF rollouts. 'final' animates only the last checkpoint.",
+    )
     parser.add_argument("--clean", action="store_true", help="Delete the output directory before running.")
     return parser.parse_args()
 
@@ -55,6 +62,8 @@ def main() -> None:
 
 
 def run_experiment(args: argparse.Namespace) -> dict[str, np.ndarray]:
+    if not hasattr(args, "animations"):
+        args.animations = "final"
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -96,9 +105,11 @@ def run_experiment(args: argparse.Namespace) -> dict[str, np.ndarray]:
             "epochs_per_task": args.epochs_per_task,
             "eval_episodes": args.eval_episodes,
             "max_steps": args.max_steps,
+            "animations": args.animations,
         },
         output_dir / "run_config.json",
     )
+    _write_gallery(output_dir, methods=args.methods, task_names=task_names)
     _write_report(output_dir, all_matrices, task_names)
     print(f"\nDone. Open {output_dir / 'REPORT.md'}")
     return all_matrices
@@ -167,6 +178,15 @@ def _run_method(
                 task=tasks[eval_index],
                 output_path=rollout_dir / f"{tasks[eval_index].name}.png",
             )
+            should_animate = args.animations == "all" or (
+                args.animations == "final" and train_index == len(tasks) - 1
+            )
+            if should_animate:
+                save_rollout_gif(
+                    rollout,
+                    task=tasks[eval_index],
+                    output_path=rollout_dir / f"{tasks[eval_index].name}.gif",
+                )
 
     task_names = [task.name for task in tasks]
     save_matrix_csv(matrix, task_names, output_dir / "success_matrix.csv")
@@ -191,6 +211,8 @@ def _write_report(output_dir: Path, matrices: dict[str, np.ndarray], task_names:
         "",
         "![Method comparison](method_comparison.png)",
         "",
+        "Open `DEMO_GALLERY.html` in a browser to watch animated robot rollouts.",
+        "",
         "## Final mean success on seen tasks",
         "",
     ]
@@ -204,6 +226,52 @@ def _write_report(output_dir: Path, matrices: dict[str, np.ndarray], task_names:
         lines.append(f"- `{method}/metrics.json`: forgetting summary and final score")
 
     (output_dir / "REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_gallery(output_dir: Path, methods: list[str], task_names: list[str]) -> None:
+    html = [
+        "<!doctype html>",
+        "<html lang=\"en\">",
+        "<head>",
+        "  <meta charset=\"utf-8\">",
+        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+        "  <title>Continual Robot Simulation Demo</title>",
+        "  <style>",
+        "    body { font-family: system-ui, sans-serif; margin: 24px; background: #f7f7f4; color: #202020; }",
+        "    h1 { margin-bottom: 4px; }",
+        "    h2 { margin-top: 32px; }",
+        "    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }",
+        "    figure { margin: 0; background: white; border: 1px solid #ddd; border-radius: 8px; padding: 12px; }",
+        "    img { width: 100%; height: auto; display: block; }",
+        "    figcaption { margin-top: 8px; font-size: 14px; font-weight: 600; }",
+        "    .note { color: #555; margin-top: 0; }",
+        "  </style>",
+        "</head>",
+        "<body>",
+        "  <h1>Continual Robot Simulation Demo</h1>",
+        "  <p class=\"note\">Animated final-checkpoint rollouts after the policy has learned the full task sequence.</p>",
+        "  <p><a href=\"REPORT.md\">Open report</a> | <a href=\"method_comparison.png\">Method comparison</a></p>",
+    ]
+
+    final_task = task_names[-1]
+    for method in methods:
+        html.append(f"  <h2>{method}</h2>")
+        html.append("  <div class=\"grid\">")
+        for task_name in task_names:
+            gif_path = f"{method}/rollouts/after_{len(task_names):02d}_{final_task}/{task_name}.gif"
+            png_path = f"{method}/rollouts/after_{len(task_names):02d}_{final_task}/{task_name}.png"
+            html.extend(
+                [
+                    "    <figure>",
+                    f"      <a href=\"{gif_path}\"><img src=\"{gif_path}\" alt=\"{method} {task_name} rollout\" onerror=\"this.src='{png_path}'\"></a>",
+                    f"      <figcaption>{task_name}</figcaption>",
+                    "    </figure>",
+                ]
+            )
+        html.append("  </div>")
+
+    html.extend(["</body>", "</html>"])
+    (output_dir / "DEMO_GALLERY.html").write_text("\n".join(html) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
