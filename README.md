@@ -106,7 +106,9 @@ demo. The key knobs are:
 ```bash
 python -m continual_robot_sim.run_demo \
   --replay-samples-per-task 4096 \
-  --replay-epoch-multiplier 1.6
+  --episodes-per-task 120 \
+  --epochs-per-task 14 \
+  --replay-epoch-multiplier 1.8
 ```
 
 Add `--no-replay-balance` if you want a weaker replay ablation where old and new

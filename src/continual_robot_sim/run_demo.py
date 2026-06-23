@@ -40,8 +40,8 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Task names. Defaults to the full built-in sequence.",
     )
-    parser.add_argument("--episodes-per-task", type=int, default=80)
-    parser.add_argument("--epochs-per-task", type=int, default=10)
+    parser.add_argument("--episodes-per-task", type=int, default=120)
+    parser.add_argument("--epochs-per-task", type=int, default=14)
     parser.add_argument("--eval-episodes", type=int, default=18)
     parser.add_argument("--max-steps", type=int, default=90)
     parser.add_argument("--batch-size", type=int, default=128)
@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--replay-epoch-multiplier",
         type=float,
-        default=1.6,
+        default=1.8,
         help="Replay-only multiplier for epochs per task.",
     )
     parser.add_argument(
