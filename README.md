@@ -27,6 +27,7 @@ the repo evaluates all tasks seen so far and writes:
 - per-task rollout trajectory PNGs
 - animated rollout GIFs for the final checkpoint
 - a browser-viewable demo gallery
+- an interactive live robot-arm viewer
 - forgetting metrics in JSON
 
 Implemented continual-learning baselines:
@@ -65,9 +66,16 @@ Open the animated robot viewer:
 runs/quickstart/DEMO_GALLERY.html
 ```
 
+Open the live canvas simulation:
+
+```text
+runs/quickstart/LIVE_SIM.html
+```
+
 The most useful files are:
 
 ```text
+runs/quickstart/LIVE_SIM.html
 runs/quickstart/method_comparison.png
 runs/quickstart/finetune/success_matrix.png
 runs/quickstart/replay/success_matrix.png
