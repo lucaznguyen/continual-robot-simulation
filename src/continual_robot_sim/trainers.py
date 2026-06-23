@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import ceil
 from typing import Literal
 
 import torch
@@ -19,7 +20,9 @@ class TrainerConfig:
     epochs_per_task: int = 12
     batch_size: int = 128
     lr: float = 3e-3
-    replay_samples_per_task: int = 256
+    replay_samples_per_task: int = 4096
+    replay_epoch_multiplier: float = 1.6
+    replay_balance_tasks: bool = True
     ewc_lambda: float = 80.0
     device: str = "cpu"
 
@@ -38,10 +41,21 @@ class ReplayMemory:
         self.observations.append(dataset.observations[indices].detach().cpu())
         self.actions.append(dataset.actions[indices].detach().cpu())
 
-    def dataset_with(self, current: TaskDataset) -> TensorDataset:
+    def dataset_with(self, current: TaskDataset, balance_tasks: bool = True) -> TensorDataset:
         obs = [current.observations] + self.observations
         actions = [current.actions] + self.actions
+        if balance_tasks:
+            target = max(tensor.shape[0] for tensor in obs)
+            obs = [_repeat_to_size(tensor, target) for tensor in obs]
+            actions = [_repeat_to_size(tensor, target) for tensor in actions]
         return TensorDataset(torch.cat(obs, dim=0), torch.cat(actions, dim=0))
+
+
+def _repeat_to_size(tensor: torch.Tensor, target: int) -> torch.Tensor:
+    if tensor.shape[0] >= target:
+        return tensor
+    repeats = ceil(target / tensor.shape[0])
+    return tensor.repeat((repeats, 1))[:target]
 
 
 @dataclass
@@ -105,7 +119,10 @@ class ContinualTrainer:
 
     def train_task(self, dataset: TaskDataset, task_number: int, seed: int) -> dict[str, float]:
         if self.config.method == "replay" and self.replay.observations:
-            torch_dataset = self.replay.dataset_with(dataset)
+            torch_dataset = self.replay.dataset_with(
+                dataset,
+                balance_tasks=self.config.replay_balance_tasks,
+            )
         else:
             torch_dataset = dataset.as_tensor_dataset()
 
@@ -120,7 +137,10 @@ class ContinualTrainer:
         self.model.train()
         last_bc_loss = 0.0
         last_total_loss = 0.0
-        for _epoch in range(self.config.epochs_per_task):
+        epochs = self.config.epochs_per_task
+        if self.config.method == "replay":
+            epochs = max(epochs, ceil(epochs * self.config.replay_epoch_multiplier))
+        for _epoch in range(epochs):
             for obs, actions in loader:
                 obs = obs.to(self.config.device)
                 actions = actions.to(self.config.device)

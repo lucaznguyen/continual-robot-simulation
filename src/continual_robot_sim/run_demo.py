@@ -45,6 +45,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-episodes", type=int, default=18)
     parser.add_argument("--max-steps", type=int, default=90)
     parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument(
+        "--replay-samples-per-task",
+        type=int,
+        default=4096,
+        help="Maximum demonstrations retained per previous task for replay.",
+    )
+    parser.add_argument(
+        "--replay-epoch-multiplier",
+        type=float,
+        default=1.6,
+        help="Replay-only multiplier for epochs per task.",
+    )
+    parser.add_argument(
+        "--no-replay-balance",
+        action="store_true",
+        help="Disable equal weighting across current and replayed tasks.",
+    )
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--device", default="cpu")
     parser.add_argument(
@@ -115,6 +132,9 @@ def run_experiment(args: argparse.Namespace) -> dict[str, np.ndarray]:
             "eval_episodes": args.eval_episodes,
             "max_steps": args.max_steps,
             "animations": args.animations,
+            "replay_samples_per_task": args.replay_samples_per_task,
+            "replay_epoch_multiplier": args.replay_epoch_multiplier,
+            "replay_balance_tasks": not args.no_replay_balance,
         },
         output_dir / "run_config.json",
     )
@@ -132,6 +152,8 @@ def _run_method(
     datasets,
     output_dir: Path,
 ) -> tuple[np.ndarray, dict[str, dict]]:
+    # Keep method comparisons fair: each method starts from the same initial policy.
+    torch.manual_seed(args.seed)
     probe_env = collect_expert_dataset(
         task=tasks[0],
         task_index=0,
@@ -150,6 +172,9 @@ def _run_method(
             method=method,
             epochs_per_task=args.epochs_per_task,
             batch_size=args.batch_size,
+            replay_samples_per_task=args.replay_samples_per_task,
+            replay_epoch_multiplier=args.replay_epoch_multiplier,
+            replay_balance_tasks=not args.no_replay_balance,
             device=args.device,
         ),
     )

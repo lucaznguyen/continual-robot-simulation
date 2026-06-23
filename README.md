@@ -33,7 +33,7 @@ the repo evaluates all tasks seen so far and writes:
 Implemented continual-learning baselines:
 
 - `finetune`: sequential training, usually forgets earlier tasks
-- `replay`: keeps a small memory of previous demonstrations
+- `replay`: keeps a balanced rehearsal buffer of previous demonstrations
 - `ewc`: Elastic Weight Consolidation regularizes important parameters
 
 ## Quickstart
@@ -99,6 +99,18 @@ python -m continual_robot_sim.run_demo \
 
 Use `--animations all` if you want GIFs after every training checkpoint, not
 only after the final task.
+
+Replay is intentionally configured as the strongest baseline in the default
+demo. The key knobs are:
+
+```bash
+python -m continual_robot_sim.run_demo \
+  --replay-samples-per-task 4096 \
+  --replay-epoch-multiplier 1.6
+```
+
+Add `--no-replay-balance` if you want a weaker replay ablation where old and new
+task samples are simply concatenated.
 
 ## How to read the result
 
